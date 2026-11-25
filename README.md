@@ -1,5 +1,7 @@
 # OpenCode Capability Router
 
+[![CI](https://github.com/robertluiz/opencode-capability-router/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/ci.yml)
+
 Discover tools and skills on demand in OpenCode. Eligible agents start with a smaller tool list, find what they need with `find_capabilities`, and keep selected tools available across follow-up messages and context compaction.
 
 ## Compatibility
