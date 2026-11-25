@@ -11,6 +11,8 @@
     "tag-store.mjs",
     "README.md",
     "install.ps1",
+    "install-linux.sh",
+    "install-macos.sh",
     "uninstall.ps1",
     "manage.mjs"
   ]

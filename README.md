@@ -4,12 +4,28 @@ Discover tools and skills on demand in OpenCode. Eligible agents start with a sm
 
 ## Quick start
 
-Requires Windows, PowerShell, Node.js, and OpenCode V2. From this checkout or the extracted package directory, run:
+Requires Node.js and OpenCode V2. Run the installer for your operating system from this checkout or the extracted package directory.
+
+**Windows (PowerShell):**
 
 ```powershell
 .\install.ps1 -WhatIf  # Preview; optional
 .\install.ps1
 ```
+
+**macOS:**
+
+```sh
+sh ./install-macos.sh
+```
+
+**Linux:**
+
+```sh
+sh ./install-linux.sh
+```
+
+> The installers for macOS and Linux have not yet been tested on those operating systems.
 
 Restart OpenCode and start a new session. The installer copies and registers the plugin without replacing your agent settings. To try discovery, select an existing `router` or `orchestrator` agent and ask it to find a missing capability:
 
@@ -40,12 +56,14 @@ An explicit `OPENCODE_SEMANTIC_INDEX_MODEL` setting takes precedence over `agent
 
 The default configuration is `opencode/opencode.json` under `$env:XDG_CONFIG_HOME` (or `$HOME/.config`). The package is installed under `$env:XDG_DATA_HOME` (or `$HOME/.local/share`) at `opencode/capability-router/package`.
 
-To use a different profile or package directory, pass `-ConfigPath` and `-Destination` to both scripts. Keep the destination outside the profile's plugin autodiscovery directory. The installer expects strict JSON and refuses to overwrite unmanaged or modified packages.
+To use a different profile or package directory, pass `-ConfigPath` and `-Destination` on Windows, or `--config` and `--destination` on macOS and Linux. Use the same values to uninstall. Keep the destination outside the profile's plugin autodiscovery directory. The installer expects strict JSON and refuses to overwrite unmanaged or modified packages.
 
 ```powershell
 .\uninstall.ps1 -WhatIf
 .\uninstall.ps1
 ```
+
+On macOS and Linux, run `node ./manage.mjs uninstall .` from the checkout or package directory.
 
 Restart OpenCode after uninstalling. Uninstall removes the registration, preserves unrelated settings, and does not delete the index.
 
