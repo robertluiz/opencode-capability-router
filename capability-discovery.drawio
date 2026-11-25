@@ -1,0 +1,25 @@
+<mxGraphModel>
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+    <mxCell id="request" value="OpenCode builds the request context" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+      <mxGeometry x="24" y="105" width="210" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="decision" value="Agent missing a capability?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+      <mxGeometry x="286" y="87" width="206" height="84" as="geometry"/>
+    </mxCell>
+    <mxCell id="reuse" value="Agent reuses available capabilities" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+      <mxGeometry x="564" y="24" width="224" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="search" value="Router searches via find_capabilities" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+      <mxGeometry x="564" y="105" width="224" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="available" value="OpenCode exposes it on the next model call" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+      <mxGeometry x="906" y="105" width="248" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="e1" edge="1" parent="1" source="request" target="decision"><mxGeometry relative="1" as="geometry"></mxGeometry></mxCell>
+    <mxCell id="e2" value="No" edge="1" parent="1" source="decision" target="reuse"><mxGeometry relative="1" as="geometry"></mxGeometry></mxCell>
+    <mxCell id="e3" value="Yes" edge="1" parent="1" source="decision" target="search"><mxGeometry relative="1" as="geometry"></mxGeometry></mxCell>
+    <mxCell id="e4" value="Match found" edge="1" parent="1" source="search" target="available"><mxGeometry relative="1" as="geometry"></mxGeometry></mxCell>
+  </root>
+</mxGraphModel>

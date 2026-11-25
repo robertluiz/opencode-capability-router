@@ -37,12 +37,33 @@ If neither agent exists, add `"router": { "mode": "primary" }` to the `agents` o
 
 ## How it works
 
+```mermaid
+flowchart LR
+    accTitle: On-demand capability discovery
+    A["OpenCode builds the request context"] --> B{"Agent missing a capability?"}
+    B -->|No| C["Agent reuses available capabilities"]
+    B -->|Yes| D["Router searches via find_capabilities"]
+    D -->|Match found| E["OpenCode exposes it on the next model call"]
+```
+
 - Use tools and skill instructions already available. Search only for what is missing.
 - Use an exact ID for a known capability. For a natural-language search, include the action, object, and any constraints that change the choice.
 - If both a tool and a skill are needed, leave `kind` unset and search for them together. Otherwise, use `kind` to narrow the search.
 - Discovery does not execute tools or load skill instructions. OpenCode still enforces access and execution permissions.
 
 For normal primary agents other than `router` and `orchestrator`, the plugin leaves the existing tool list alone.
+
+## Results and context savings
+
+- **Capability reuse:** In an isolated Docker test, one discovery call was enough for **37 completed reads across 9 automatic compactions**, including a follow-up message, with no tool errors.
+- **Query size:** A separate benchmark ran the same 36-turn workload with identical results and one search per turn. Short queries were 31 bytes; long queries were 237 bytes.
+
+| Benchmark | Peak request: long → short | Total request traffic: long → short |
+| --- | ---: | ---: |
+| No compaction | 42.9 → 35.5 kB (**17% less**) | 2.63 → 2.22 MB (**15% less**) |
+| Two compactions | 19.4 → 16.7 kB (**14% less**) | 1.43 → 1.27 MB (**11% less**) |
+
+These are measured request bytes from controlled Docker runs, not billed tokens or a comparison against loading the full tool catalog. Total traffic includes repeated history and, where applicable, compaction requests. Reuse already available capabilities and keep new queries short without dropping constraints.
 
 ## Semantic indexing and privacy
 
