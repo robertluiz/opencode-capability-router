@@ -2,6 +2,15 @@
 
 Discover tools and skills on demand in OpenCode. Eligible agents start with a smaller tool list, find what they need with `find_capabilities`, and keep selected tools available across follow-up messages and context compaction.
 
+## Compatibility
+
+| OpenCode version | Status |
+| --- | --- |
+| 2.3.2 | Tested: discovery, capability reuse after compaction, and semantic indexing. |
+| 2.4.1 | An earlier revision loaded successfully; the current public version has not been tested end to end. |
+| Other 2.x versions | Not yet verified. |
+| 1.x | Not compatible. The plugin requires the V2 agent and session APIs. |
+
 ## Quick start
 
 Requires Node.js and OpenCode V2. Run the installer for your operating system from this checkout or the extracted package directory.
