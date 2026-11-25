@@ -1,0 +1,17 @@
+{
+  "name": "opencode-capability-router",
+  "version": "2.0.3",
+  "private": true,
+  "type": "module",
+  "exports": "./index.ts",
+  "files": [
+    "index.ts",
+    "candidate.ts",
+    "semantic-indexer.ts",
+    "tag-store.mjs",
+    "README.md",
+    "install.ps1",
+    "uninstall.ps1",
+    "manage.mjs"
+  ]
+}
