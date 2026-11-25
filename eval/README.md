@@ -31,7 +31,7 @@ docker run --rm --network none --mount "type=bind,source=$PWD,target=/router,rea
 
 En WSL, ejecuta los mismos comandos desde la ruta del repositorio accesible desde Linux (`$PWD` debe ser una ruta de WSL). Para construir sin red si ya está disponible la imagen de QA local, añade `--network none --build-arg OPENCODE_IMAGE=router-mcp-qa:isolated` a `docker build`.
 
-El contenedor prueba el código montado en `/router` con OpenCode 2.3.2 y un proveedor local determinista, sin modelos externos ni credenciales reales. El proveedor simula el consumo de tokens; OpenCode realiza las compactaciones y lee el fichero de prueba. El escenario exige al menos 9 compactaciones automáticas, 37 lecturas completadas (una tras un nuevo mensaje), una sola llamada a `find_capabilities` y ningún error de ejecución de herramientas.
+El contenedor prueba el código montado en `/router` con OpenCode 2.3.2 por defecto y un proveedor local determinista, sin modelos externos ni credenciales reales. Para probar otra versión, añade, por ejemplo, `--build-arg OPENCODE_IMAGE=ghcr.io/anomalyco/opencode:2.4.1` a `docker build`. El proveedor simula el consumo de tokens; OpenCode realiza las compactaciones y lee el fichero de prueba. El escenario exige al menos 9 compactaciones automáticas, 37 lecturas completadas (una tras un nuevo mensaje), una sola llamada a `find_capabilities` y ningún error de ejecución de herramientas.
 
 ## Modelo explícito para el indexador
 

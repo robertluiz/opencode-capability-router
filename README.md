@@ -4,16 +4,19 @@ Discover tools and skills on demand in OpenCode. Eligible agents start with a sm
 
 ## Compatibility
 
+**Supported OpenCode versions: 2.2.0 and later in the 2.x series.** The table distinguishes versions tested in Docker from versions not yet verified.
+
 | OpenCode version | Status |
 | --- | --- |
-| 2.3.2 | Tested: discovery, capability reuse after compaction, and semantic indexing. |
-| 2.4.1 | An earlier revision loaded successfully; the current public version has not been tested end to end. |
-| Other 2.x versions | Not yet verified. |
+| 2.2.0, 2.3.2, 2.4.1 | Tested in Docker: discovery, capability reuse after compaction, and semantic indexing with inherited and explicit models. |
+| Other 2.x versions from 2.2.0 onward | Not individually tested. |
+| 2.0.0 | Not fully compatible. The plugin API lacks `ctx.tool.list()`, which semantic indexing requires, and the compaction test did not complete. |
+| Other versions below 2.2.0 in the 2.x series | Not supported; not tested. |
 | 1.x | Not compatible. The plugin requires the V2 agent and session APIs. |
 
 ## Quick start
 
-Requires Node.js and OpenCode V2. Run the installer for your operating system from this checkout or the extracted package directory.
+Requires Node.js and OpenCode 2.2.0 or later in the 2.x series. Run the installer for your operating system from this checkout or the extracted package directory.
 
 **Windows (PowerShell):**
 

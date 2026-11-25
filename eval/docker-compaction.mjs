@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const version = execFileSync("opencode", ["--version"], { encoding: "utf8" }).trim();
-assert.match(version, /\bv?2\.3\.2$/);
+assert.match(version, /\bv?2\.\d+\.\d+$/);
 const work = mkdtempSync(join(tmpdir(), "router-compaction-"));
 const marker = "router-compaction-fixture-marker";
 const path = join(work, "marker.txt");
@@ -19,6 +19,7 @@ const readLimit = readsPerCompaction * expectedCompactions;
 const stats = { attempts: 0, discovery: 0, missing: 0, followup: 0 };
 let followup = false;
 let sequence = 0;
+let childID;
 
 const stub = createServer(async (req, res) => {
   try {
@@ -28,7 +29,11 @@ const stub = createServer(async (req, res) => {
     const offered = new Set(tools.map((tool) => tool.function?.name));
     const userTexts = messages.filter((message) => message.role === "user").map((message) => JSON.stringify(message.content));
     const summarize = userTexts.some((text) => /You MUST summarize the conversation above|Update the existing checkpoint in the conversation above/.test(text));
-    const parentNotification = userTexts.some((text) => text.includes("<subagent sessionID="));
+    // The parent also calls the stub when OpenCode delivers the child's completion.
+    const latestUser = messages.findLast((message) => message.role === "user")?.content;
+    const parentNotification = childID && typeof latestUser === "string" &&
+      (latestUser.startsWith(`<subagent sessionID="${childID}"`) ||
+       latestUser.startsWith(`<background-result kind="subagent" sessionID="${childID}"`));
     let name, args, text, inputTokens = 50;
     if (summarize) {
       text = `## Objective\nRead the fixture.\n\n## Requirements\nContinue this turn.\n\n## Decisions\nNone.\n\n## Work State\n### Completed\nSelected read.\n### Active\nRead the fixture.\n### Blocked\nNone.\n\n## Next Move\nRead ${path}.\n\n## Relevant Files\n${path}.\n\n## Important Context\nRead is already selected.`;
@@ -100,7 +105,7 @@ try {
     return JSON.parse(text);
   }
   for (let i = 0; ; i++) {
-    try { await api("info"); break; }
+    try { await api("session"); break; }
     catch (error) {
       if (i === 99 || host.exitCode !== null) throw error;
       await sleep(100);
@@ -108,6 +113,7 @@ try {
   }
   const { data: parent } = await api("session", { agent: "orchestrator", model });
   const { data: child } = await api("session", { parentID: parent.id, agent: "worker", model });
+  childID = child.id;
   const session = `session/${child.id}`;
   const messages = async () => (await api(`${session}/message?limit=200`)).data;
   async function prompt(text) {

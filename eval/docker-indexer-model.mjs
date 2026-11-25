@@ -82,7 +82,7 @@ try {
     return response.json();
   }
   for (let i = 0; ; i++) {
-    try { await api("info"); break; }
+    try { await api("session"); break; }
     catch (error) { if (i === 99 || host.exitCode !== null) throw error; await sleep(100); }
   }
   const { data: main } = await api("session", installed ? {} : { agent: "router", model: trigger });
