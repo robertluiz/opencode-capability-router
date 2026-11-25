@@ -25,8 +25,7 @@ async function check(name,model,env,expected,permissions=deny,agentModel){
       if(chosen.variant) assert.throws(()=>request({...chosen,variant:undefined}));
       batch=JSON.parse(x.text.split('Catalog: ')[1]);
     },wait:async()=>{},context:async()=>[{type:'assistant',agent:'indexer',time:{completed:1},content:[{type:'text',text:JSON.stringify({items:batch.map(x=>({kind:x.kind,id:x.id,concepts:{action:['read'],object:[],scope:[],effects:[],aliases:[]}}))})}]}]}};
-  syncSemanticIndex(ctx,[item],model);
-  await new Promise(r=>setTimeout(r,250));
+  await syncSemanticIndex(ctx,[item],model);
   if(expected){assert.deepEqual(created.model,expected,name);assert.equal(created.parentID,undefined);const e={agent:'indexer',tools:{read:{},shell:{}}};hooks.context(e);assert.deepEqual(e.tools,{});assert.ok((await loadConcepts(ctx)).has('tool:alpha'));}
   else assert.equal(created,undefined,name);
 }
@@ -57,16 +56,13 @@ try{
     hook:async(name,f)=>{hooks[name]=f},create:async x=>{calls.push(x);return {id:'index-'+calls.length,agent:'indexer'}},
     prompt:async x=>{hooks['model.request']({agent:'indexer',sessionID:x.sessionID,model:calls.at(-1).model});currentBatch=JSON.parse(x.text.split('Catalog: ')[1])},wait:async()=>{},
     context:async()=>[{type:'assistant',agent:'indexer',time:{completed:1},content:[{type:'text',text:JSON.stringify({items:currentBatch.map(x=>({kind:x.kind,id:x.id,concepts:{action:[],object:[],scope:[],effects:[],aliases:[]}}))})}]}]}};
-  syncSemanticIndex(shared,[{kind:'tool',id:'one',description:'first'}],{providerID:'openai',id:'first-model'});
-  await new Promise(r=>setTimeout(r,250));
+  await syncSemanticIndex(shared,[{kind:'tool',id:'one',description:'first'}],{providerID:'openai',id:'first-model'});
   configured=terra;
-  syncSemanticIndex(shared,[{kind:'tool',id:'one',description:'first'}],{providerID:'openai',id:'first-model'});
-  await new Promise(r=>setTimeout(r,250));
+  await syncSemanticIndex(shared,[{kind:'tool',id:'one',description:'first'}],{providerID:'openai',id:'first-model'});
   assert.equal(calls.length,1,'changing only the indexer model does not schedule a job');
   configured=undefined;
   registry.push({name:'two',description:'second'});
-  syncSemanticIndex(shared,[{kind:'tool',id:'two',description:'second'}],{providerID:'openai',id:'second-model',variant:'high'});
-  await new Promise(r=>setTimeout(r,250));
+  await syncSemanticIndex(shared,[{kind:'tool',id:'two',description:'second'}],{providerID:'openai',id:'second-model',variant:'high'});
   assert.deepEqual(calls.map(x=>x.model),[{providerID:'openai',id:'first-model'},{providerID:'openai',id:'second-model',variant:'high'}]);
   console.log('Model inheritance and explicit opt-in, override precedence, opt-out, model/provider/variant veto, isolation, deny-all and no model-only job: passed');
 }finally{process.env=saved;await rm(root,{recursive:true,force:true})}

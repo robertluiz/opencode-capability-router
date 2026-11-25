@@ -163,7 +163,7 @@ async function index(ctx:any, target:string, items:Item[], model:Model, useAgent
     } finally { expectedModels.get(ctx)?.delete(session.id); }
   } finally { await rmdir(lock).catch(()=>{}); }
 }
-export function syncSemanticIndex(ctx:any,items:Item[], effectiveModel?:Model):void {
+export function syncSemanticIndex(ctx:any,items:Item[], effectiveModel?:Model):Promise<void>|undefined {
   try {
     if(process.env.OPENCODE_SEMANTIC_INDEX_ENABLED==='0') return;
     if(!allowed(effectiveModel)) return;
@@ -177,7 +177,7 @@ export function syncSemanticIndex(ctx:any,items:Item[], effectiveModel?:Model):v
     }
     const target=location(ctx); if(active.has(target)||!Array.isArray(items)) return;
     active.add(target);
-    void index(ctx,target,items.slice(0,maxItems),model,!override).catch(()=>{}).finally(()=>active.delete(target));
+    return index(ctx,target,items.slice(0,maxItems),model,!override).catch(()=>{}).finally(()=>{active.delete(target)});
   } catch { /* lexical fallback */ }
 }
 export async function loadConcepts(ctx:any):Promise<Map<string,Concepts>> {
