@@ -1,0 +1,16 @@
+name: OpenCode 2.2.0
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  regressions:
+    uses: ./.github/workflows/opencode-regression.yml
+    with:
+      version: '2.2.0'

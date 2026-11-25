@@ -1,0 +1,30 @@
+name: OpenCode regression
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build evaluator
+        env:
+          OPENCODE_VERSION: ${{ inputs.version }}
+        run: docker build --build-arg "OPENCODE_IMAGE=ghcr.io/anomalyco/opencode:$OPENCODE_VERSION" -t router-eval ./eval
+      - name: Compaction
+        run: docker run --rm --network none --mount "type=bind,source=$PWD,target=/router,readonly" router-eval
+      - name: Indexer (installed)
+        run: docker run --rm --network none --mount "type=bind,source=$PWD,target=/router,readonly" router-eval /eval/indexer-model.mjs installed
+      - name: Indexer (explicit)
+        run: docker run --rm --network none --mount "type=bind,source=$PWD,target=/router,readonly" router-eval /eval/indexer-model.mjs

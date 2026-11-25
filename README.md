@@ -1,6 +1,9 @@
 # OpenCode Capability Router
 
-[![CI](https://github.com/robertluiz/opencode-capability-router/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/ci.yml)
+[![Tests](https://github.com/robertluiz/opencode-capability-router/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/ci.yml)
+[![OpenCode 2.2.0](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.2.0.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.2.0.yml)
+[![OpenCode 2.3.2](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.3.2.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.3.2.yml)
+[![OpenCode 2.4.1](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.4.1.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.4.1.yml)
 
 Discover tools and skills on demand in OpenCode. Eligible agents start with a smaller tool list, find what they need with `find_capabilities`, and keep selected tools available across follow-up messages and context compaction.
 
