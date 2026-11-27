@@ -1,0 +1,212 @@
+name: Release
+
+on:
+  # The workflow needs status writes; only the trusted workflow SHA is checked out.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
+    branches: [main]
+    types: [opened, reopened, synchronize, edited, closed]
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  GH_REPO: ${{ github.repository }}
+  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+  PR_NUMBER: ${{ github.event.number }}
+  STATUS_CONTEXT: release/pr-source-and-notes
+
+jobs:
+  preview:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-preview-${{ github.event.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve PR test merge
+        id: merge
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          git fetch --no-tags origin refs/heads/main
+          [[ "$(git rev-parse FETCH_HEAD)" == "$BASE_SHA" ]]
+          git fetch --no-tags origin "refs/pull/$PR_NUMBER/merge"
+          merge_sha=$(git rev-parse FETCH_HEAD)
+          [[ "$(git show -s --format=%P "$merge_sha")" == "$BASE_SHA $HEAD_SHA" ]]
+          printf 'sha=%s\n' "$merge_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Set pending status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECK_SHA: ${{ steps.merge.outputs.sha }}
+        run: |
+          gh api --method POST "repos/$GH_REPO/statuses/$CHECK_SHA" \
+            -f state=pending -f context="$STATUS_CONTEXT" >/dev/null
+
+      - name: Validate release source
+        id: source
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          [[ "$HEAD_REPO" == "$GH_REPO" ]]
+          git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"
+          git check-ref-format "refs/heads/$HEAD_REF"
+          case "$HEAD_REF" in
+            beta) lane=beta ;;
+            fix|fix/*) lane=fix ;;
+            *) echo 'Release PRs must come from beta, fix, or fix/*.' >&2; exit 1 ;;
+          esac
+          echo "lane=$lane" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Collect release inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: ${{ steps.source.outputs.lane }}
+        run: |
+          if [[ "$LANE" == beta ]]; then
+            gh api --paginate --slurp "repos/$GH_REPO/pulls?state=closed&base=beta&per_page=100" |
+              jq 'add // []' > "$RUNNER_TEMP/release-input.json"
+          else
+            echo '[]' > "$RUNNER_TEMP/release-input.json"
+          fi
+
+      - name: Generate release preview
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          LANE: ${{ steps.source.outputs.lane }}
+          RELEASE_PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          tag=$(node scripts/release.mjs preview "$BASE_SHA" "$HEAD_SHA" "$LANE" "$PR_NUMBER" "$GH_REPO" \
+            < "$RUNNER_TEMP/release-input.json")
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf '## Release preview: %s\n\n' "$tag" >> "$GITHUB_STEP_SUMMARY"
+          cat release-preview.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-preview-${{ github.run_attempt }}
+          path: release-preview.md
+          if-no-files-found: error
+
+      - name: Check committed release notes
+        run: |
+          if ! git show "$HEAD_SHA:RELEASE_NOTES.md" > "$RUNNER_TEMP/committed-notes.md" ||
+             ! cmp -s "$RUNNER_TEMP/committed-notes.md" release-preview.md; then
+            echo 'Commit RELEASE_NOTES.md matching the release preview artifact.' >&2
+            exit 1
+          fi
+
+      - name: Set final gate status
+        if: always() && steps.merge.outputs.sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          CHECK_SHA: ${{ steps.merge.outputs.sha }}
+        run: |
+          state=failure
+          if [[ "$JOB_STATUS" == success ]]; then state=success; fi
+          gh api --method POST "repos/$GH_REPO/statuses/$CHECK_SHA" \
+            -f state="$state" -f context="$STATUS_CONTEXT" \
+            -f target_url="$GITHUB_SERVER_URL/$GH_REPO/actions/runs/$GITHUB_RUN_ID" >/dev/null
+
+  publish:
+    if: >-
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.pull_request.head.ref == 'beta' ||
+       github.event.pull_request.head.ref == 'fix' ||
+       startsWith(github.event.pull_request.head.ref, 'fix/'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      MERGED_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Verify merged release
+        id: release
+        run: |
+          [[ "$HEAD_REPO" == "$GH_REPO" ]]
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$MERGED_SHA" =~ ^[0-9a-f]{40}$ && "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          git check-ref-format "refs/heads/$HEAD_REF"
+          case "$HEAD_REF" in
+            beta) lane=beta ;;
+            fix|fix/*) lane=fix ;;
+            *) exit 1 ;;
+          esac
+          git fetch --no-tags origin refs/heads/main
+          git merge-base --is-ancestor "$MERGED_SHA" FETCH_HEAD
+          parents=$(git show -s --format=%P "$MERGED_SHA")
+          read -r first second extra <<< "$parents"
+          [[ "$first" =~ ^[0-9a-f]{40}$ && "$second" == "$HEAD_SHA" && -z "$extra" ]]
+          git merge-base --is-ancestor "$first" "$HEAD_SHA"
+          [[ "$(git rev-parse "$MERGED_SHA^{tree}")" == "$(git rev-parse "$HEAD_SHA^{tree}")" ]]
+          tag=$(node scripts/release.mjs verify "$first" "$MERGED_SHA" "$lane" "$PR_NUMBER" "$GH_REPO")
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          tag_ref="refs/tags/$TAG"
+          tag_target() {
+            local refs
+            refs=$(git ls-remote origin "$tag_ref" "$tag_ref^{}") || return
+            printf '%s\n' "$refs" | awk -v ref="$tag_ref" \
+              '$2 == ref { direct=$1 } $2 == ref "^{}" { peeled=$1 } END { print (peeled ? peeled : direct) }'
+          }
+          target=$(tag_target)
+          if [[ -z "$target" ]]; then
+            # Create the exact ref atomically; never retarget an existing tag.
+            gh api --method POST "repos/$GH_REPO/git/refs" -f ref="$tag_ref" -f sha="$MERGED_SHA" >/dev/null ||
+              [[ "$(tag_target)" == "$MERGED_SHA" ]]
+          fi
+          if [[ "$(tag_target)" != "$MERGED_SHA" ]]; then
+            echo "Tag $TAG does not point to $MERGED_SHA." >&2
+            exit 1
+          fi
+          if ! existing=$(gh release view "$TAG" --json tagName,isDraft,body); then
+            gh release create "$TAG" --verify-tag --target "$MERGED_SHA" --notes-file release-preview.md ||
+              echo 'Creation failed; checking whether a concurrent run published it.' >&2
+            existing=$(gh release view "$TAG" --json tagName,isDraft,body)
+          fi
+          if ! jq -e --arg tag "$TAG" --rawfile notes release-preview.md \
+              '.tagName == $tag and (.isDraft == false) and (.body == $notes)' <<< "$existing" >/dev/null; then
+            echo 'Existing release does not match the approved notes.' >&2
+            exit 1
+          fi
+          [[ "$(tag_target)" == "$MERGED_SHA" ]]
