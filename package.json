@@ -6,9 +6,9 @@
   "exports": "./index.ts",
   "files": [
     "index.ts",
-    "candidate.ts",
-    "semantic-indexer.ts",
-    "tag-store.mjs",
+    "src/candidate.ts",
+    "src/semantic-indexer.ts",
+    "src/tag-store.mjs",
     "README.md",
     "install.ps1",
     "install-linux.sh",

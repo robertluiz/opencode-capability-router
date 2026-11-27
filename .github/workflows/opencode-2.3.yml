@@ -1,16 +1,19 @@
-name: OpenCode 2.4.1
+name: OpenCode 2.3.x
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '37 6 * * 1'
 
 permissions:
   contents: read
 
 jobs:
   regressions:
+    name: OpenCode 2.3.x
     uses: ./.github/workflows/opencode-regression.yml
     with:
-      version: '2.4.1'
+      minor: '2.3'

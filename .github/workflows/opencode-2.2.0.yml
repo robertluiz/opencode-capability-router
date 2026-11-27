@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   regressions:
+    name: OpenCode 2.2.0
     uses: ./.github/workflows/opencode-regression.yml
     with:
       version: '2.2.0'

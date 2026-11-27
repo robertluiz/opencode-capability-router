@@ -2,19 +2,20 @@
 
 [![Tests](https://github.com/robertluiz/opencode-capability-router/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/ci.yml)
 [![OpenCode 2.2.0](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.2.0.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.2.0.yml)
-[![OpenCode 2.3.2](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.3.2.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.3.2.yml)
-[![OpenCode 2.4.1](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.4.1.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.4.1.yml)
+[![OpenCode 2.3.x](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.3.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.3.yml)
+[![OpenCode 2.4.x](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.4.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.4.yml)
 
 Discover tools and skills on demand in OpenCode. Eligible agents start with a smaller tool list, find what they need with `find_capabilities`, and keep selected tools available across follow-up messages and context compaction.
 
 ## Compatibility
 
-**Supported OpenCode versions: 2.2.0 and later in the 2.x series.** The table distinguishes versions tested in Docker from versions not yet verified.
+**Minimum supported OpenCode version: 2.2.0.** CI always retests this exact version. For newer series in the matrix, CI selects the highest stable patch from the official package at runtime. The workflow log shows the exact version tested.
 
 | OpenCode version | Status |
 | --- | --- |
-| 2.2.0, 2.3.2, 2.4.1 | Tested in Docker: discovery, capability reuse after compaction, and semantic indexing with inherited and explicit models. |
-| Other 2.x versions from 2.2.0 onward | Not individually tested. |
+| 2.2.0 | Fixed compatibility baseline in CI. |
+| 2.3.x, 2.4.x | Latest stable patch of each series tested in CI. |
+| Other 2.x versions from 2.2.0 onward | Outside the continuous test matrix. |
 | 2.0.0 | Not fully compatible. The plugin API lacks `ctx.tool.list()`, which semantic indexing requires, and the compaction test did not complete. |
 | Other versions below 2.2.0 in the 2.x series | Not supported; not tested. |
 | 1.x | Not compatible. The plugin requires the V2 agent and session APIs. |
@@ -107,12 +108,22 @@ Restart OpenCode after uninstalling. Uninstall removes the registration, preserv
 
 ## Test and package
 
-Run the local checks from the source checkout:
+The plugin code lives in `src/`, local tests in `tests/`, and Docker and live evaluations in `eval/`. The editable discovery diagram is in `docs/capability-discovery.drawio`.
+
+Run the full local suite on Windows from the source checkout:
 
 ```powershell
-node --test eval/router-compaction.test.mjs indexer-model-test.mjs storage-test.mjs
+node --test tests/*.test.mjs
 ```
+
+On other platforms, run `node --test tests/router-compaction.test.mjs tests/semantic-discovery.test.mjs tests/indexer-model.test.mjs tests/storage.test.mjs`. `tests/installer.test.mjs` uses Windows PowerShell.
 
 `eval/README.md` documents the Docker and optional live tests. To build a local package, create `dist` and run `npm pack --pack-destination dist`. Only the package allowlist is included.
 
 For questions and bug reports, use the repository's Issues tab. Include the OpenCode version and the smallest reproducible example; remove credentials and private logs.
+
+## Security checks
+
+The `Security` workflow runs on pull requests to `main`, pushes to `main`, and weekly. CodeQL scans JavaScript and TypeScript; zizmor fails the workflow audit on medium or high findings; Trivy checks the checked-out files for secrets and packages it can identify in the Docker evaluator images for high or critical vulnerabilities. Dependency Review checks PRs for newly introduced high or critical vulnerabilities reported by GitHub's dependency graph. The plugin currently has no declared npm dependencies.
+
+Enable the dependency graph before validating the workflow on a pull request. After successful push and PR runs, configure a ruleset for `main` that requires the `Dependency review`, `Workflow audit`, and `Secrets and Docker dependencies` checks, at least one approving review, and CodeQL code-scanning merge protection. A successful CodeQL workflow only means the scan ran; the code-scanning rule is what blocks merges based on its alerts. Review changes to workflow files, Dockerfiles, and scanner settings carefully. Use GitHub secret scanning and push protection for coverage beyond the checked-out files.

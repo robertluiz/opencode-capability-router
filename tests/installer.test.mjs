@@ -17,6 +17,15 @@ try {
   const originalNumber='1234567890123456789012345';
   run('install'); assert.deepEqual(read().plugins,['other',dest.replaceAll('\\','/')]); assert.ok(fs.readFileSync(config,'utf8').includes(originalNumber));
   run('install'); assert.equal(read().plugins.length,2);
+  const unknown=path.join(dest,'src','unknown.txt');
+  const beforeUnknown=fs.readFileSync(config);
+  fs.writeFileSync(unknown,'keep');
+  for (const operation of ['install','uninstall']) {
+    run(operation,false);
+    assert.deepEqual(fs.readFileSync(config),beforeUnknown);
+    assert.equal(fs.readFileSync(unknown,'utf8'),'keep');
+  }
+  fs.unlinkSync(unknown);
   let t=fs.readFileSync(config,'utf8').replace('"secret":"not-printed"','"secret":"edited"');fs.writeFileSync(config,t);
   run('uninstall'); assert.deepEqual(read().plugins,['other']); assert.equal(read().secret,'edited');
   run('uninstall');

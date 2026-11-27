@@ -18,25 +18,32 @@ const plugin = join(root, "plugin");
 const trace = join(root, "tools.jsonl");
 const password = "router-eval-loopback";
 let host;
-const skill = "fixture-log-checklist";
+const skills = [
+  ["fixture-log-retention", "Consult the checklist for retention and archival of fixture startup logs.", "TOPAZIO-9174"],
+  ["fixture-log-checklist", "Consult the checklist for diagnosing startup failures from fixture logs.", "COBALTO-5028"],
+  ["fixture-log-redaction", "Consult the checklist for redacting sensitive fields in fixture startup logs.", "JADE-2841"],
+];
+const skillIDs = skills.map(([id]) => id);
+const [, [triageSkill, , triageCode]] = skills;
 const logPath = join(project, "service-a", "startup.log");
 try {
-  await Promise.all([mkdir(project), mkdir(plugin)]);
-  await Promise.all(["candidate.ts", "semantic-indexer.ts", "tag-store.mjs", "package.json"].map((file) =>
+  await Promise.all([mkdir(project), mkdir(join(plugin, "src"), { recursive: true })]);
+  await Promise.all(["src/candidate.ts", "src/semantic-indexer.ts", "src/tag-store.mjs", "package.json"].map((file) =>
     copyFile(new URL(`../${file}`, import.meta.url), join(plugin, file))));
   await writeFile(join(plugin, "index.ts"), `
     import { appendFileSync } from "node:fs";
     import { resolve } from "node:path";
-    import router from "./candidate.ts";
+    import router from "./src/candidate.ts";
     export default { id: "router-live-discovery-eval", async setup(ctx) {
       appendFileSync(${JSON.stringify(trace)}, JSON.stringify({ setup: true }) + "\\n");
       const files = new Set(${JSON.stringify([join(project, "first.txt"), join(project, "second.txt"), logPath])});
+      const skillIDs = new Set(${JSON.stringify(skillIDs)});
       await ctx.tool.hook("execute.before", (event) => {
         if (event.tool === "find_capabilities") return;
-        if (event.tool === "skill" && event.input?.id === ${JSON.stringify(skill)}) return;
+        if (event.tool === "skill" && skillIDs.has(event.input?.id)) return;
         if (event.tool !== "read" || typeof event.input?.path !== "string" ||
             !files.has(resolve(${JSON.stringify(project)}, event.input.path))) {
-          throw new Error("Only fixture files may be read in this eval.");
+          throw new Error("Only discovery, fixture skills, and fixture reads are allowed in this eval.");
         }
       });
       const session = Object.create(ctx.session);
@@ -47,8 +54,10 @@ try {
       const skills = Object.create(ctx.skill);
       Object.defineProperty(skills, "list", { value: async () => {
         const result = await ctx.skill.list();
-        const onlyFixture = (entries) => entries.filter((entry) => entry.id === ${JSON.stringify(skill)});
-        return Array.isArray(result) ? onlyFixture(result) : { ...result, data: onlyFixture(result.data) };
+        const entries = (Array.isArray(result) ? result : result.data).filter((entry) => skillIDs.has(entry.id));
+        const found = new Set(entries.map((entry) => entry.id));
+        if ([...skillIDs].some((id) => !found.has(id))) throw new Error("Incomplete fixture skill catalog.");
+        return Array.isArray(result) ? entries : { ...result, data: entries };
       } });
       await router.setup(Object.create(ctx, { session: { value: session }, skill: { value: skills } }));
     }};
@@ -60,17 +69,20 @@ try {
     agents: { router: { mode: "primary", model: ref, permissions: [
       { action: "*", resource: "*", effect: "deny" },
       ...["find_capabilities", "read"].map((action) => ({ action, resource: "*", effect: "allow" })),
-      { action: "skill", resource: skill, effect: "allow" },
+      ...skillIDs.map((resource) => ({ action: "skill", resource, effect: "allow" })),
     ] } },
     compaction: { auto: false },
   }));
-  const skillDir = join(project, ".opencode", "skills", skill);
-  await Promise.all([mkdir(dirname(logPath), { recursive: true }), mkdir(skillDir, { recursive: true })]);
+  await mkdir(dirname(logPath), { recursive: true });
   await Promise.all([
     writeFile(join(project, "first.txt"), "ARANDUVA-7239"),
     writeFile(join(project, "second.txt"), "TAMURAI-6184"),
     writeFile(logPath, "BIRIBA-3901"),
-    writeFile(join(skillDir, "SKILL.md"), `---\nname: ${skill}\ndescription: Read the checklist for triage of fixture startup logs.\n---\n# Fixture log checklist\nThe checklist code is COBALTO-5028. Do not execute commands or change files.\n`),
+    ...skills.map(async ([id, description, code]) => {
+      const dir = join(project, ".opencode", "skills", id);
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "SKILL.md"), `---\nname: ${id}\ndescription: ${description}\n---\n# Fixture log checklist\nThe checklist code is ${code}. Do not execute commands or change files.\n`);
+    }),
   ]);
   const env = {
     ...process.env,
@@ -116,8 +128,8 @@ try {
     ["What is the exact content of the local file first.txt? Reply with just the content.", "ARANDUVA-7239", 1, 1],
     ["And what is the exact content of second.txt in the same directory? Reply with just the content.", "TAMURAI-6184", 0, 1],
     ["Use uma ferramenta de leitura para ler somente service-a/startup.log, sem executar comandos de terminal nem modificar arquivos. Responda apenas com o conteúdo exato.", "BIRIBA-3901", 1, 1, "tool"],
-    ["Qual é o código do checklist de triagem de logs de inicialização desta fixture? Consulte as instruções do checklist sem executar comandos nem modificar arquivos. Responda apenas com o código.", "COBALTO-5028", 1, 0, "skill"],
-    ["Leia somente service-a/startup.log e consulte o checklist de triagem de logs de inicialização desta fixture. Sem executar comandos nem modificar arquivos, responda com o conteúdo do log e o código do checklist separados por um espaço.", "BIRIBA-3901 COBALTO-5028", 1, 1, "mixed"],
+    ["Qual é o código do checklist de triagem de logs de inicialização desta fixture? Consulte as instruções do checklist sem executar comandos nem modificar arquivos. Responda apenas com o código.", triageCode, 1, 0, "skill"],
+    ["Leia somente service-a/startup.log e consulte o checklist de triagem de logs de inicialização desta fixture. Sem executar comandos nem modificar arquivos, responda com o conteúdo do log e o código do checklist separados por um espaço.", `BIRIBA-3901 ${triageCode}`, 1, 1, "mixed"],
   ];
   const results = [];
   const surfaces = async () => {
@@ -156,8 +168,8 @@ try {
         const discovery = recent.filter((call) => call.name === "find_capabilities");
         const searches = discovery.length;
         const reads = recent.filter((call) => call.name === "read" && call.state.status === "completed").length;
-        const answer = assistant.at(-1).content.filter((part) => part.type === "text").map((part) => part.text).join("").trim();
-        assert.equal(answer, expected, `Discoveries: ${JSON.stringify(discovery.map((call) => ({
+        const answer = assistant.at(-1).content.filter((part) => part.type === "text").map((part) => part.text).join("");
+        assert.equal(discoveryKind === "skill" || discoveryKind === "mixed" ? answer : answer.trim(), expected, `Discoveries: ${JSON.stringify(discovery.map((call) => ({
           input: call.state.input, result: call.state.content,
         })))}`);
         const projected = await surfaces();
@@ -177,7 +189,10 @@ try {
             assert.ok(intent.scope?.some((scope) => scope.includes("service-a/startup.log")));
           }
           const loaded = recent.filter((part) => part.name === "skill").map((part) => part.state.input.id);
-          assert.deepEqual(loaded, discoveryKind === "tool" ? [] : [skill]);
+          assert.deepEqual(loaded, discoveryKind === "tool" ? [] : [triageSkill]);
+          if (discoveryKind === "tool") {
+            assert.ok(projected.every((entry) => !entry.tools.includes("skill")), "Skill tool exposed in a tool-only session.");
+          }
           if (discoveryKind === "mixed") {
             assert.equal(call.state.input.kind, undefined, "A mixed lookup must not restrict kind.");
             assert.ok(intent.objectives.some(({ object }) => /checklist/i.test(object)));

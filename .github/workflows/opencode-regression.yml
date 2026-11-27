@@ -3,8 +3,9 @@ name: OpenCode regression
 on:
   workflow_call:
     inputs:
+      minor:
+        type: string
       version:
-        required: true
         type: string
 
 permissions:
@@ -18,10 +19,45 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - name: Resolve OpenCode version
+        id: resolve
+        shell: bash
+        env:
+          OPENCODE_MINOR: ${{ inputs.minor }}
+          OPENCODE_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ -n "$OPENCODE_VERSION" && -z "$OPENCODE_MINOR" ]]; then
+            version=$OPENCODE_VERSION
+          elif [[ -z "$OPENCODE_VERSION" && -n "$OPENCODE_MINOR" ]]; then
+            version=$(npm view --registry=https://registry.npmjs.org @opencode/cli versions --json | node eval/resolve-opencode-versions.mjs "$OPENCODE_MINOR")
+          else
+            printf 'Specify exactly one of version or minor\n' >&2
+            exit 1
+          fi
+          if [[ ! "$version" =~ ^2\.([2-9]|[1-9][0-9]+)\.(0|[1-9][0-9]*)$ ]]; then
+            printf 'Expected a stable OpenCode 2.x version at or above 2.2.0\n' >&2
+            exit 1
+          fi
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
       - name: Build evaluator
         env:
-          OPENCODE_VERSION: ${{ inputs.version }}
+          OPENCODE_VERSION: ${{ steps.resolve.outputs.version }}
         run: docker build --build-arg "OPENCODE_IMAGE=ghcr.io/anomalyco/opencode:$OPENCODE_VERSION" -t router-eval ./eval
+      - name: Verify OpenCode version
+        env:
+          OPENCODE_VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          actual=$(docker run --rm --network none --entrypoint opencode router-eval --version)
+          if [[ "$actual" != "opencode v$OPENCODE_VERSION" ]]; then
+            printf 'Expected OpenCode %s, got %s\n' "$OPENCODE_VERSION" "$actual" >&2
+            exit 1
+          fi
+          printf 'Testing %s\n' "$actual"
+      - name: Deterministic Node tests
+        run: >-
+          docker run --rm --network none --mount "type=bind,source=$PWD,target=/router,readonly"
+          --workdir /router router-eval --test tests/router-compaction.test.mjs
+          tests/semantic-discovery.test.mjs tests/indexer-model.test.mjs tests/storage.test.mjs
       - name: Compaction
         run: docker run --rm --network none --mount "type=bind,source=$PWD,target=/router,readonly" router-eval
       - name: Indexer (installed)

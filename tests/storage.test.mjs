@@ -12,7 +12,8 @@ if (!process.env.ROUTER_TEST_CHILD) {
   } finally { await rm(dir, {recursive:true, force:true}); }
 } else {
   const {homedir} = await import('node:os');
-  const {loadConcepts} = await import('./semantic-indexer.ts');
+  const {loadConcepts} = await import('../src/semantic-indexer.ts');
+  const {cleanTags, identityKey, itemKey, indexPath, load, save} = await import('../src/tag-store.mjs');
   const hash = x => createHash('sha256').update(x).digest('hex');
   const file = hash(JSON.stringify(['test','project']))+'.json';
   const legacy = path.join(homedir(),'.config','opencode','router-qa','semantic-indexes',file);
@@ -24,5 +25,24 @@ if (!process.env.ROUTER_TEST_CHILD) {
   await mkdir(path.dirname(current),{recursive:true}); await writeFile(current,state('current'));
   assert.equal((await loadConcepts(ctx)).get('tool:example').action[0],'current');
   await writeFile(current,'invalid'); assert.equal((await loadConcepts(ctx)).size,0);
+  const profile=process.env.OPENCODE_TAG_PROFILE, project=ctx.location.directory;
+  const item={kind:'tool',id:'example',description:'example'};
+  const key=identityKey(item), version=itemKey(item);
+  const tags=cleanTags([' Read ', 'READ', 'C++', 'has\nnewline', '???', 42, 'x'.repeat(41)]);
+  assert.deepEqual(tags,['read','c++']);
+  assert.throws(()=>cleanTags(Array(13).fill('read')), /Invalid tags structure/);
+  await save(profile,project,[{key,version,tags:[...tags,'read']}]);
+  const expected={[key]:{version,tags}};
+  assert.deepEqual(await load(profile,project),expected);
+  assert.deepEqual(await load('other-profile',project),{});
+  assert.deepEqual(await load(profile,'other-project'),{});
+  await assert.rejects(save(profile,project,[{key,version,tags:['READ']}]), /Invalid index entries/);
+  assert.deepEqual(await load(profile,project),expected);
+  await writeFile(indexPath(profile,project),JSON.stringify({version:1,tags:{
+    ...expected,
+    invalid:{version,tags},
+    [hash('invalid tags')]:{version,tags:['READ']},
+  }}));
+  assert.deepEqual(await load(profile,project),expected);
   console.log('Legacy fallback, current precedence, invalid-index lexical fallback: passed');
 }

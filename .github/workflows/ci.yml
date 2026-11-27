@@ -20,4 +20,4 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - run: node --test eval/router-compaction.test.mjs indexer-model-test.mjs storage-test.mjs installer-test.mjs
+      - run: node --test tests/*.test.mjs

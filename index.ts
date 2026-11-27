@@ -1,1 +1,1 @@
-export { default } from './candidate.ts';
+export { default } from './src/candidate.ts';
