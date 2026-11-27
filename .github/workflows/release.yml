@@ -4,6 +4,12 @@ on:
   workflow_run: # zizmor: ignore[dangerous-triggers] Trusted checkout only; upstream refs are data.
     workflows: [Tests]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Open release PR to validate
+        type: number
+        required: true
   push:
     branches: [main]
 
@@ -20,11 +26,13 @@ env:
 jobs:
   preview:
     if: >-
-      github.event_name == 'workflow_run' &&
+      (github.event_name == 'workflow_run' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.path == '.github/workflows/ci.yml' &&
-      github.event.workflow_run.head_repository.id == github.event.repository.id
+      github.event.workflow_run.head_repository.id == github.event.repository.id) ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -41,8 +49,12 @@ jobs:
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
+          MANUAL_PR: ${{ inputs.pull_request }}
         run: |
-          pr_number=$(jq -er '
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            pr_number=$MANUAL_PR
+          else
+            pr_number=$(jq -er '
             .repository.id as $repo | .workflow_run |
             select(.head_sha | strings | test("^[0-9a-f]{40}$")) |
             select(.pull_requests | type == "array" and length == 1) |
@@ -50,16 +62,22 @@ jobs:
             select(.head.sha == $run.head_sha and .head.ref == $run.head_branch and
                    .head.repo.id == $repo and .base.repo.id == $repo and .base.ref == "main") |
             select(.id | numbers) | .number | numbers
-          ' "$GITHUB_EVENT_PATH")
+            ' "$GITHUB_EVENT_PATH")
+          fi
           [[ "$pr_number" =~ ^[1-9][0-9]*$ ]]
           gh api "repos/$GH_REPO/pulls/$pr_number" > "$RUNNER_TEMP/release-pr.json"
-          jq -er --slurpfile event "$GITHUB_EVENT_PATH" --arg repo "$GH_REPO" '
+          jq -er --slurpfile event "$GITHUB_EVENT_PATH" --arg repo "$GH_REPO" \
+            --arg ref "$GITHUB_REF" --arg sha "$GITHUB_SHA" --arg event_name "$GITHUB_EVENT_NAME" '
             $event[0].workflow_run.pull_requests[0] as $snapshot |
-            select(.state == "open" and .id == $snapshot.id and .number == $snapshot.number and
-                   .base.ref == "main" and .base.repo.id == $snapshot.base.repo.id and
-                   .base.sha == $snapshot.base.sha and (.base.sha | strings | test("^[0-9a-f]{40}$")) and
-                   .head.repo.id == $snapshot.head.repo.id and .head.repo.full_name == $repo and
-                   .head.sha == $snapshot.head.sha and .head.ref == $snapshot.head.ref) |
+            select(.state == "open" and .base.ref == "main" and .base.repo.full_name == $repo and .head.repo.full_name == $repo) |
+            select(if $event_name == "workflow_dispatch" then
+              $ref == "refs/heads/main" or ($ref == "refs/heads/beta" and .head.ref == "beta" and .head.sha == $sha)
+            else
+              .id == $snapshot.id and .number == $snapshot.number and .base.sha == $snapshot.base.sha and
+              .head.sha == $snapshot.head.sha and .head.ref == $snapshot.head.ref
+            end) |
+            select(.base.sha | strings | test("^[0-9a-f]{40}$")) |
+            select(.head.sha | strings | test("^[0-9a-f]{40}$")) |
             "number=\(.number)", "base_sha=\(.base.sha)", "head_sha=\(.head.sha)"
           ' "$RUNNER_TEMP/release-pr.json" >> "$GITHUB_OUTPUT"
 
@@ -81,7 +99,7 @@ jobs:
       - name: Set pending status
         env:
           GH_TOKEN: ${{ github.token }}
-          CHECK_SHA: ${{ steps.merge.outputs.sha }}
+          CHECK_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
           gh api --method POST "repos/$GH_REPO/statuses/$CHECK_SHA" \
             -f state=pending -f context="$STATUS_CONTEXT" >/dev/null
@@ -157,19 +175,26 @@ jobs:
           JOB_STATUS: ${{ job.status }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           BASE_SHA: ${{ steps.pr.outputs.base_sha }}
-          CHECK_SHA: ${{ steps.merge.outputs.sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          MERGE_SHA: ${{ steps.merge.outputs.sha }}
         run: |
           state=failure
           if [[ "$JOB_STATUS" == success ]]; then
             git fetch --no-tags origin refs/heads/main
             [[ "$(git rev-parse FETCH_HEAD)" == "$BASE_SHA" ]]
             git fetch --no-tags origin "refs/pull/$PR_NUMBER/merge"
-            [[ "$(git rev-parse FETCH_HEAD)" == "$CHECK_SHA" ]]
-            state=success
+            [[ "$(git rev-parse FETCH_HEAD)" == "$MERGE_SHA" ]]
+            # GitHub requires this context on the PR head. Reject a shared head.
+            if gh api --paginate --slurp "repos/$GH_REPO/pulls?state=open&base=main&per_page=100" |
+              jq -e --arg head "$HEAD_SHA" --argjson pr "$PR_NUMBER" \
+                '[.[][] | select(.head.sha == $head) | .number] == [$pr]' >/dev/null; then
+              state=success
+            fi
           fi
-          gh api --method POST "repos/$GH_REPO/statuses/$CHECK_SHA" \
+          gh api --method POST "repos/$GH_REPO/statuses/$HEAD_SHA" \
             -f state="$state" -f context="$STATUS_CONTEXT" \
             -f target_url="$GITHUB_SERVER_URL/$GH_REPO/actions/runs/$GITHUB_RUN_ID" >/dev/null
+          [[ "$state" == success ]]
 
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !github.event.deleted
