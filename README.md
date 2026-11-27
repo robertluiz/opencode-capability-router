@@ -120,7 +120,15 @@ On other platforms, run `node --test tests/router-compaction.test.mjs tests/sema
 
 `eval/README.md` documents the Docker and optional live tests. To build a local package, create `dist` and run `npm pack --pack-destination dist`. Only the package allowlist is included.
 
-For questions and bug reports, use the repository's Issues tab. Include the OpenCode version and the smallest reproducible example; remove credentials and private logs.
+For questions and non-security bugs, use the repository's Issues tab. Include the OpenCode version and a minimal example without credentials or private logs. For contributions and private vulnerability reports, see `CONTRIBUTING.md` and `SECURITY.md` in the source repository.
+
+## License
+
+OC Router is licensed under MIT. You can use and modify it, including commercially. Keep the copyright and license notices with any copies or substantial portions you redistribute.
+
+## Releases
+
+Integrate changes into `beta`, then promote them to `main` by pull request. Urgent fixes can use a `fix` or `fix/*` branch. The source repository's `docs/releasing.md` covers release notes, versioning, and the `main` ruleset.
 
 ## Security checks
 
