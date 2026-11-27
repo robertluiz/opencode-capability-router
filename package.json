@@ -1,7 +1,8 @@
 {
   "name": "opencode-capability-router",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "exports": "./index.ts",
   "files": [
@@ -10,6 +11,7 @@
     "src/semantic-indexer.ts",
     "src/tag-store.mjs",
     "README.md",
+    "LICENSE",
     "oc-router.svg",
     "install.ps1",
     "install-linux.sh",
