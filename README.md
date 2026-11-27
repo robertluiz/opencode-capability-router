@@ -1,4 +1,4 @@
-# OpenCode Capability Router
+# <img src="./oc-router.svg" alt="" width="40" height="40"> OC Router
 
 [![Tests](https://github.com/robertluiz/opencode-capability-router/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/ci.yml)
 [![OpenCode 2.2.0](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.2.0.yml/badge.svg?branch=main)](https://github.com/robertluiz/opencode-capability-router/actions/workflows/opencode-2.2.0.yml)

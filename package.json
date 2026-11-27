@@ -10,6 +10,7 @@
     "src/semantic-indexer.ts",
     "src/tag-store.mjs",
     "README.md",
+    "oc-router.svg",
     "install.ps1",
     "install-linux.sh",
     "install-macos.sh",
