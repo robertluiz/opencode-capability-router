@@ -5,14 +5,14 @@ Use pull requests to integrate work into `beta`. Promote a batch with a PR from 
 ## Prepare and publish
 
 1. Bring the source branch up to date with `main` using a merge, then raise `version` in `package.json` (for example, `2.0.3` → `2.0.4` for a patch). Use a stable `major.minor.patch` version.
-2. Open or update the PR to `main`. The **Release** workflow produces a preview in the run summary and an artifact. For `beta`, it lists merged PRs whose merge commits are in the proposed history but not already in `main`. For a `fix` branch, it lists the fix PR itself.
+2. Open or update the PR to `main`. After its **Tests** workflow succeeds, **Release** produces a preview in the run summary and an artifact. For `beta`, it lists merged PRs whose merge commits are in the proposed history but not already in `main`. For a `fix` branch, it lists the fix PR itself.
 3. Commit the generated preview as `RELEASE_NOTES.md` on the source branch. The `release/pr-source-and-notes` check compares it with the generated notes and reports the result on the PR's test merge commit. If the PR changes, use the new preview before merging.
 4. Verify the PR's source branch, then review the notes and test results. Do not reuse a release PR's head commit as the head of another open PR to `main`. Merge with **Create a merge commit**, not squash or rebase. This preserves the history used to keep already released beta PRs out of the next release.
-5. After the merge, Actions publishes a GitHub Release and tag `v<version>` for the exact merge commit, using the approved notes. Nothing is published to npm. After a hotfix, merge `main` back into `beta` before the next promotion.
+5. The resulting update to `main` triggers publication. Actions verifies the associated merged PR and publishes a GitHub Release and tag `v<version>` for that exact commit, using the approved notes. Nothing is published to npm. After a hotfix, merge `main` back into `beta` before the next promotion.
 
 ## One-time repository setup
 
-If the workflow is not yet on `main`, create `beta` from the current `main` and use a reviewed bootstrap PR to install it. The pre-merge workflow uses the version already on `main`, so it cannot enforce its own bootstrap PR.
+If the workflow is not yet on `main`, create `beta` from the current `main` and use a reviewed bootstrap PR to install it. The pre-merge workflow uses the version already on `main`, so it cannot enforce its own bootstrap PR. The preview reads PR inputs as data; it does not execute PR code or read artifacts produced by the Tests workflow.
 
 After the workflow is present, verify that GitHub recognizes the status on both a `beta` PR and a rejected source PR, including when two PRs share the same head. Then configure an active GitHub ruleset targeting `main`:
 
